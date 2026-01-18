@@ -12,6 +12,21 @@ import time
 import re
 
 
+async def safe_log(ctx: Optional[Context], level: str, message: str):
+    """Безопасное логирование с таймаутом, чтобы не блокировать выполнение"""
+    if ctx is None:
+        return
+    try:
+        # Используем таймаут для логирования, чтобы не зависать
+        if level == "info":
+            await asyncio.wait_for(ctx.info(message), timeout=1.0)
+        elif level == "error":
+            await asyncio.wait_for(ctx.error(message), timeout=1.0)
+    except (asyncio.TimeoutError, Exception):
+        # Игнорируем ошибки логирования, чтобы не блокировать основной процесс
+        pass
+
+
 @dataclass
 class SearchResult:
     title: str
@@ -80,7 +95,8 @@ class DuckDuckGoSearcher:
                 "kl": "",
             }
 
-            await ctx.info(f"Searching DuckDuckGo for: {query}")
+            # Используем безопасное логирование
+            await safe_log(ctx, "info", f"Searching DuckDuckGo for: {query}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -91,7 +107,7 @@ class DuckDuckGoSearcher:
             # Parse HTML response
             soup = BeautifulSoup(response.text, "html.parser")
             if not soup:
-                await ctx.error("Failed to parse HTML response")
+                await safe_log(ctx, "error", "Failed to parse HTML response")
                 return []
 
             results = []
@@ -130,17 +146,18 @@ class DuckDuckGoSearcher:
                 if len(results) >= max_results:
                     break
 
-            await ctx.info(f"Successfully found {len(results)} results")
+            # Минимизируем логирование успешных результатов
+            # await safe_log(ctx, "info", f"Successfully found {len(results)} results")
             return results
 
         except httpx.TimeoutException:
-            await ctx.error("Search request timed out")
+            await safe_log(ctx, "error", "Search request timed out")
             return []
         except httpx.HTTPError as e:
-            await ctx.error(f"HTTP error occurred: {str(e)}")
+            await safe_log(ctx, "error", f"HTTP error occurred: {str(e)}")
             return []
         except Exception as e:
-            await ctx.error(f"Unexpected error during search: {str(e)}")
+            await safe_log(ctx, "error", f"Unexpected error during search: {str(e)}")
             traceback.print_exc(file=sys.stderr)
             return []
 
@@ -154,7 +171,7 @@ class WebContentFetcher:
         try:
             await self.rate_limiter.acquire()
 
-            await ctx.info(f"Fetching content from: {url}")
+            await safe_log(ctx, "info", f"Fetching content from: {url}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -189,19 +206,18 @@ class WebContentFetcher:
             if len(text) > 8000:
                 text = text[:8000] + "... [content truncated]"
 
-            await ctx.info(
-                f"Successfully fetched and parsed content ({len(text)} characters)"
-            )
+            # Минимизируем логирование успешных результатов
+            # await safe_log(ctx, "info", f"Successfully fetched and parsed content ({len(text)} characters)")
             return text
 
         except httpx.TimeoutException:
-            await ctx.error(f"Request timed out for URL: {url}")
+            await safe_log(ctx, "error", f"Request timed out for URL: {url}")
             return "Error: The request timed out while trying to fetch the webpage."
         except httpx.HTTPError as e:
-            await ctx.error(f"HTTP error occurred while fetching {url}: {str(e)}")
+            await safe_log(ctx, "error", f"HTTP error occurred while fetching {url}: {str(e)}")
             return f"Error: Could not access the webpage ({str(e)})"
         except Exception as e:
-            await ctx.error(f"Error fetching content from {url}: {str(e)}")
+            await safe_log(ctx, "error", f"Error fetching content from {url}: {str(e)}")
             return f"Error: An unexpected error occurred while fetching the webpage ({str(e)})"
 
 
