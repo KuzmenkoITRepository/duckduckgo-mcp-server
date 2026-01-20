@@ -13,15 +13,10 @@ WORKDIR /app
 # Copy dependency files first for better layer caching
 COPY pyproject.toml uv.lock* ./
 
-# Install Python dependencies using uv pip sync (fastest - uses lock file directly)
-# uv pip sync is much faster than uv pip install because it uses pre-resolved lock file
-RUN if [ -f uv.lock ]; then \
-        uv pip sync --system uv.lock && \
-        uv pip install --system --no-deps .; \
-    else \
-        uv pip install --system --no-cache . || \
-        (pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .); \
-    fi
+# Install Python dependencies using uv pip install
+# uv automatically uses uv.lock if present for faster dependency resolution
+RUN uv pip install --system --no-cache . || \
+    (pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .)
 
 # Copy source code (after dependencies for better caching)
 COPY src ./src
