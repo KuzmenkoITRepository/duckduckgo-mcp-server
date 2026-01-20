@@ -2,17 +2,26 @@
 FROM python:3.11-alpine
 
 # Install system dependencies
-RUN apk add --no-cache gcc musl-dev linux-headers
+RUN apk add --no-cache gcc musl-dev linux-headers curl
+
+# Install uv for faster dependency management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Set working directory
 WORKDIR /app
 
-# Copy all files
-COPY . /app
+# Copy dependency files first for better layer caching
+COPY pyproject.toml ./
+COPY uv.lock* ./
 
-# Install Python dependencies
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir .
+# Install Python dependencies using uv (faster than pip) or fallback to pip
+# Note: uv.lock exists but we need to install from pyproject.toml
+RUN uv pip install --system --no-cache . || \
+    (pip install --upgrade pip && pip install --no-cache-dir .)
+
+# Copy source code (after dependencies for better caching)
+COPY src ./src
 
 # Expose port if needed (MCP uses stdio, so not required)
 
