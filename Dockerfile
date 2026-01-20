@@ -13,14 +13,12 @@ WORKDIR /app
 # Copy dependency files first for better layer caching
 COPY pyproject.toml uv.lock* ./
 COPY README.md ./
+COPY src ./src
 
-# Install Python dependencies using uv pip install
+# Install Python package (src is needed for package build)
 # uv automatically uses uv.lock if present for faster dependency resolution
 RUN uv pip install --system --no-cache . || \
     (pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .)
-
-# Copy source code (after dependencies for better caching)
-COPY src ./src
 
 # Run the MCP server
 CMD ["python", "-m", "duckduckgo_mcp_server.server"]
