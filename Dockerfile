@@ -12,6 +12,7 @@ WORKDIR /app
 
 # Copy dependency files first for better layer caching
 COPY pyproject.toml uv.lock* ./
+COPY README.md ./
 
 # Install Python dependencies using uv pip install
 # uv automatically uses uv.lock if present for faster dependency resolution
